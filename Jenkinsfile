@@ -20,7 +20,8 @@ pipeline {
     stage('SonarQube: SAST') {
       steps {
         withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
-          sh '''docker run --rm --network host -u $(id -u):$(id -g) -e SONAR_TOKEN -e SONAR_USER_HOME=/tmp/.sonar -v "$PWD":/usr/src sonarsource/sonar-scanner-cli \
+          sh '''export SONAR_TOKEN=$(printf %s "$SONAR_TOKEN" | tr -d '[:space:]')
+          docker run --rm --network host -u $(id -u):$(id -g) -e SONAR_TOKEN -e SONAR_USER_HOME=/tmp/.sonar -v "$PWD":/usr/src sonarsource/sonar-scanner-cli \
             -Dsonar.host.url=http://localhost:9000 \
             -Dsonar.projectKey=inventory-management-system \
             -Dsonar.sources=backend/src/main,frontend/src \
