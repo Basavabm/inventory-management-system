@@ -1,31 +1,27 @@
-version: '3'
 services:
-  mysql:
-    image: mysql:8.0
-    ports:
-      - "3306:3306"
+  postgres:
+    image: postgres:15
     environment:
-      MYSQL_ROOT_PASSWORD: P@ssw0rd
-      MYSQL_USER: product_user
-      MYSQL_PASSWORD: product_user_password
-      MYSQL_DATABASE: product
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: cisco
+      POSTGRES_DB: productdb
+    ports:
+      - "5432:5432"
 
   spring-boot-app:
-      build:
-        context: ./backend
-        dockerfile: Dockerfile
-      ports:
-        - "8080:8080"
-      depends_on:
-        - mysql
-      environment:
-        SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/productDb
-        SPRING_DATASOURCE_USERNAME: root
-        SPRING_DATASOURCE_PASSWORD: cisco
+    build:
+      context: ./backend
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/productdb
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: cisco
 
   react-app:
-      build:
-        context: ./frontend
-        dockerfile: Dockerfile
-      ports:
-        - "3000:80"
+    build:
+      context: ./frontend
+    ports:
+      - "3000:80"

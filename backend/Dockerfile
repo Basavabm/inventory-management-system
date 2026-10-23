@@ -1,5 +1,5 @@
 # Use the official Maven image as the base image
-FROM maven:3.8.4-openjdk-17 AS build
+FROM maven:3.9-eclipse-temurin-17 AS build
 
 # Set the working directory
 WORKDIR /app
@@ -12,7 +12,7 @@ COPY ./src /app/src
 RUN mvn clean package -Dmaven.test.skip=true
 
 # Create a new image for running the application
-FROM openjdk:17-jdk
+FROM eclipse-temurin:17-jre
 
 # Set the working directory
 WORKDIR /app
@@ -21,7 +21,7 @@ WORKDIR /app
 COPY --from=build /app/target/*.jar app.jar
 
 # Expose the port on which the Spring Boot application will run
-EXPOSE 8080
+EXPOSE 8081
 
 # Command to run the application
 CMD ["java", "-jar", "app.jar"]
