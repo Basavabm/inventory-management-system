@@ -1,22 +1,17 @@
 import { NavLink } from "react-router-dom";
 
 export default function NavBar() {
-  return(
-    <nav className="navbar navbar-expand-lg bg-body-tertiary mt-3">
-      <div className="container-fluid">
-        <a className="navbar-brand" href="#">Inventory Management System</a>
-
-        <div className="collapse navbar-collapse" id="navbarSupportedContent">
-          <ul className="navbar-nav me-auto mb-2 mb-lg-0">
-            <li className="nav-item">
-              <NavLink activeClassName="active" className="nav-link" aria-current="page" to="/">List</NavLink>
-            </li>
-            <li className="nav-item">
-              <NavLink activeClassName="active" className="nav-link" to="/new">Add</NavLink>
-            </li>
-          </ul>
-        </div>
-      </div>
+  return (
+    <nav className="navbar navbar-expand-lg bg-white rounded-4 mt-3 px-3 shadow-sm">
+      <span className="navbar-brand fw-bold">📦 Inventory Management</span>
+      <ul className="navbar-nav ms-auto flex-row gap-3">
+        <li className="nav-item">
+          <NavLink end className="nav-link" to="/">Dashboard</NavLink>
+        </li>
+        <li className="nav-item">
+          <NavLink className="nav-link" to="/new">Add Product</NavLink>
+        </li>
+      </ul>
     </nav>
   );
 }

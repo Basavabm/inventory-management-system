@@ -1,13 +1,28 @@
-body {
+html body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  background: #f3f1fb;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
 }
-
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
-}
+.d-card { background: #fff; border-radius: 20px; padding: 20px; box-shadow: 0 1px 3px rgba(60, 30, 140, .08); }
+.d-label { font-size: 15px; font-weight: 500; }
+.d-big { font-size: 30px; font-weight: 600; line-height: 1.3; }
+.d-avatar { width: 36px; height: 36px; border-radius: 50%; background: #e6defc; color: #5b34d6; display: inline-flex; align-items: center; justify-content: center; font-weight: 600; flex-shrink: 0; }
+.d-pill { font-size: 12px; font-weight: 500; padding: 4px 10px; border-radius: 20px; }
+.d-pill-ok { background: #e3f6ec; color: #17794a; }
+.d-pill-low { background: #fde4f5; color: #b3237f; }
+.d-bars { display: flex; align-items: flex-end; gap: 6px; height: 90px; }
+.d-bar { flex: 1; background: #7c4dff; border-radius: 4px; }
+.d-split { display: flex; gap: 4px; height: 90px; }
+.d-split > div { border-radius: 10px; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 13px; }
+.d-legend { display: flex; gap: 14px; font-size: 12px; }
+.d-legend i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; }
+.d-curve { width: 100%; height: 90px; }
+.d-track { background: #efeafc; border-radius: 10px; height: 10px; margin-top: 4px; }
+.d-track > div { background: #7c4dff; height: 100%; border-radius: 10px; }
+.d-chart { display: flex; align-items: flex-end; gap: 14px; height: 240px; padding-top: 10px; }
+.d-col { flex: 1; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; min-width: 0; }
+.d-colbar { width: 100%; max-width: 42px; border-radius: 6px 6px 0 0; }
+.d-collabel { margin-top: 6px; font-size: 11px; color: #6c757d; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.table > :not(caption) > * > * { border-bottom-color: #f0edf8; }
+.table thead th { color: #6c757d; font-weight: 500; font-size: 13px; }
