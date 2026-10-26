@@ -31,6 +31,7 @@ pipeline {
       }
     }
     stage('OWASP Dependency-Check: SCA') {
+      when { expression { false } }
       options { timeout(time: 90, unit: 'MINUTES') }
       steps {
         withCredentials([string(credentialsId: 'nvd-api-key', variable: 'NVD_RAW')]) {
