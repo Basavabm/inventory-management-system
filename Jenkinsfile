@@ -31,7 +31,6 @@ pipeline {
       }
     }
     stage('OWASP Dependency-Check: SCA') {
-      when { expression { false } }
       options { timeout(time: 90, unit: 'MINUTES') }
       steps {
         withCredentials([string(credentialsId: 'nvd-api-key', variable: 'NVD_RAW')]) {
@@ -42,7 +41,7 @@ pipeline {
             owasp/dependency-check:latest \
             --scan "/src/backend/target/*.jar" --scan /src/frontend/package-lock.json \
             --data /odc-data --out /src/odc-reports --format HTML --format JSON \
-            --disableNodeAudit --nvdApiKey "$NVD_KEY"'''
+            --disableNodeAudit --noupdate'''
         }
         archiveArtifacts artifacts: 'odc-reports/*', allowEmptyArchive: true
       }
