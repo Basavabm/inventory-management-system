@@ -31,19 +31,39 @@ pipeline {
       }
     }
     stage('OWASP Dependency-Check: SCA') {
-      options { timeout(time: 90, unit: 'MINUTES') }
+      options { timeout(time: 30, unit: 'MINUTES') }
       steps {
-        withCredentials([string(credentialsId: 'nvd-api-key', variable: 'NVD_RAW')]) {
-          sh '''NVD_KEY=$(printf %s "$NVD_RAW" | tr -d '[:space:]')
-          mkdir -p odc-reports
-          docker run --rm -u $(id -u):$(id -g) -e HOME=/tmp -e JAVA_OPTS=-Xmx1g \
-            -v "$PWD":/src -v /var/lib/jenkins/odc-data:/odc-data \
-            owasp/dependency-check:latest \
-            --scan "/src/backend/target/*.jar" --scan /src/frontend/package-lock.json \
-            --data /odc-data --out /src/odc-reports --format HTML --format JSON \
-            --disableNodeAudit --noupdate'''
-        }
+        sh '''mkdir -p odc-reports
+        docker run --rm -u $(id -u):$(id -g) -e HOME=/tmp -e JAVA_OPTS=-Xmx1g \
+          -v "$PWD":/src -v /var/lib/jenkins/odc-data:/odc-data \
+          owasp/dependency-check:latest \
+          --scan "/src/backend/target/*.jar" --scan /src/frontend/package-lock.json \
+          --data /odc-data --out /src/odc-reports --format HTML --format JSON \
+          --disableNodeAudit --noupdate'''
         archiveArtifacts artifacts: 'odc-reports/*', allowEmptyArchive: true
+      }
+    }
+    stage('Docker Image Build') {
+      steps {
+        sh '''docker build -t securestock-backend:${BUILD_NUMBER} backend
+        docker build -t securestock-frontend:${BUILD_NUMBER} frontend'''
+      }
+    }
+    stage('Trivy: Container Image Scan') {
+      steps {
+        sh '''mkdir -p trivy-reports
+        for img in backend frontend; do
+          trivy image --no-progress --severity HIGH,CRITICAL --format json --output trivy-reports/$img.json securestock-$img:${BUILD_NUMBER}
+          trivy image --no-progress --severity HIGH,CRITICAL securestock-$img:${BUILD_NUMBER}
+        done'''
+        archiveArtifacts artifacts: 'trivy-reports/*', allowEmptyArchive: true
+      }
+    }
+    stage('Security Gate') {
+      steps {
+        sh '''for img in backend frontend; do
+          trivy image --no-progress --severity CRITICAL --ignore-unfixed --exit-code 1 securestock-$img:${BUILD_NUMBER}
+        done'''
       }
     }
   }
