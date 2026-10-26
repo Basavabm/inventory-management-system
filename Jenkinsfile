@@ -30,5 +30,21 @@ pipeline {
         }
       }
     }
+    stage('OWASP Dependency-Check: SCA') {
+      options { timeout(time: 90, unit: 'MINUTES') }
+      steps {
+        withCredentials([string(credentialsId: 'nvd-api-key', variable: 'NVD_RAW')]) {
+          sh '''NVD_KEY=$(printf %s "$NVD_RAW" | tr -d '[:space:]')
+          mkdir -p odc-reports
+          docker run --rm -u $(id -u):$(id -g) -e HOME=/tmp -e JAVA_OPTS=-Xmx1g \
+            -v "$PWD":/src -v /var/lib/jenkins/odc-data:/odc-data \
+            owasp/dependency-check:latest \
+            --scan "/src/backend/target/*.jar" --scan /src/frontend/package-lock.json \
+            --data /odc-data --out /src/odc-reports --format HTML --format JSON \
+            --disableNodeAudit --nvdApiKey "$NVD_KEY"'''
+        }
+        archiveArtifacts artifacts: 'odc-reports/*', allowEmptyArchive: true
+      }
+    }
   }
 }
