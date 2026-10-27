@@ -1,0 +1,4 @@
+# CVE-2026-47884: Spring MVC XsltView SSRF/RCE.
+# Not exploitable here: the app is a REST JSON API and does not use XsltView or view rendering.
+# The open-source fix exists only in Spring Framework 7.0.9 (Spring Boot 4.x). Revisit by expiry date.
+CVE-2026-47884 exp:2026-12-31
