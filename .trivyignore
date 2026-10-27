@@ -2,3 +2,10 @@
 # Not exploitable here: the app is a REST JSON API and does not use XsltView or view rendering.
 # The open-source fix exists only in Spring Framework 7.0.9 (Spring Boot 4.x). Revisit by expiry date.
 CVE-2026-47884 exp:2026-12-31
+
+# Tomcat CVE-2026-65182, 65905, 68525: security-constraint, DIGEST and FORM auth bypasses.
+# Not used here: REST API with no Tomcat authentication or security constraints.
+# Fix is Tomcat 10.1.58, not on Maven Central yet. Re-check and remove when it is published.
+CVE-2026-65182 exp:2026-11-30
+CVE-2026-65905 exp:2026-11-30
+CVE-2026-68525 exp:2026-11-30
