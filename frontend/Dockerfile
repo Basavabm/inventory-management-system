@@ -17,6 +17,7 @@ RUN npm run build
 
 # Serve stage
 FROM nginx:1.28-alpine
+RUN apk upgrade --no-cache
 
 # Copy the custom nginx.conf file to the container
 COPY .docker/nginx.conf /etc/nginx/nginx.conf
