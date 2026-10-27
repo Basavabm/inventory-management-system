@@ -1,5 +1,9 @@
 terraform {
   required_version = ">= 1.5"
+
+  # State is kept on the Jenkins VM (path is passed at init time)
+  backend "local" {}
+
   required_providers {
     aws = {
       source  = "hashicorp/aws"

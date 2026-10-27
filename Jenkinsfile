@@ -1,5 +1,9 @@
 pipeline {
   agent any
+  parameters {
+    booleanParam(name: 'PROVISION', defaultValue: false, description: 'Create ECR + EKS on AWS (costs about $0.14/hour)')
+    booleanParam(name: 'DESTROY', defaultValue: false, description: 'Delete everything Terraform created on AWS')
+  }
   options { timestamps() }
   stages {
     stage('Gitleaks: Secret Scan') {
@@ -80,6 +84,48 @@ pipeline {
     stage('Infrastructure Gate') {
       steps {
         sh 'docker run --rm -v "$PWD/terraform":/tf bridgecrew/checkov:latest -d /tf --framework terraform --compact --quiet --skip-download'
+      }
+    }
+    stage('Terraform: Plan') {
+      when { expression { return params.PROVISION } }
+      steps {
+        withCredentials([string(credentialsId: 'aws-access-key-id', variable: 'AWS_ACCESS_KEY_ID'), string(credentialsId: 'aws-secret-access-key', variable: 'AWS_SECRET_ACCESS_KEY')]) {
+          sh '''mkdir -p /var/lib/jenkins/tfstate/plugins
+          CIDR="$(curl -s https://checkip.amazonaws.com | tr -d '[:space:]')/32"
+          echo "EKS API will be limited to $CIDR"
+          sh scripts/tf.sh init -input=false -backend-config=path=/state/terraform.tfstate
+          sh scripts/tf.sh plan -input=false -var=authorized_cidr=$CIDR -out=tfplan'''
+        }
+      }
+    }
+    stage('Approval: Provision AWS') {
+      when { expression { return params.PROVISION } }
+      steps {
+        timeout(time: 30, unit: 'MINUTES') {
+          input message: 'Create ECR + EKS on AWS now? Review the plan above. Costs about $0.14/hour.', ok: 'Apply'
+        }
+      }
+    }
+    stage('Terraform: Apply') {
+      when { expression { return params.PROVISION } }
+      steps {
+        withCredentials([string(credentialsId: 'aws-access-key-id', variable: 'AWS_ACCESS_KEY_ID'), string(credentialsId: 'aws-secret-access-key', variable: 'AWS_SECRET_ACCESS_KEY')]) {
+          sh '''sh scripts/tf.sh apply -input=false tfplan
+          sh scripts/tf.sh output'''
+        }
+      }
+    }
+    stage('Terraform: Destroy') {
+      when { expression { return params.DESTROY } }
+      steps {
+        timeout(time: 30, unit: 'MINUTES') {
+          input message: 'DELETE the AWS resources created by Terraform?', ok: 'Destroy'
+        }
+        withCredentials([string(credentialsId: 'aws-access-key-id', variable: 'AWS_ACCESS_KEY_ID'), string(credentialsId: 'aws-secret-access-key', variable: 'AWS_SECRET_ACCESS_KEY')]) {
+          sh '''CIDR="$(curl -s https://checkip.amazonaws.com | tr -d '[:space:]')/32"
+          sh scripts/tf.sh init -input=false -backend-config=path=/state/terraform.tfstate
+          sh scripts/tf.sh destroy -input=false -auto-approve -var=authorized_cidr=$CIDR'''
+        }
       }
     }
   }
