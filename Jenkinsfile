@@ -66,5 +66,21 @@ pipeline {
         done'''
       }
     }
+    stage('Terraform: Validate') {
+      steps {
+        sh '''docker run --rm -u $(id -u):$(id -g) -e HOME=/tmp -v "$PWD/terraform":/tf -w /tf hashicorp/terraform:1.9 init -backend=false -input=false
+        docker run --rm -u $(id -u):$(id -g) -e HOME=/tmp -v "$PWD/terraform":/tf -w /tf hashicorp/terraform:1.9 validate'''
+      }
+    }
+    stage('Checkov: IaC Security Scan') {
+      steps {
+        sh 'docker run --rm -v "$PWD/terraform":/tf bridgecrew/checkov:latest -d /tf --framework terraform --compact --skip-download --soft-fail'
+      }
+    }
+    stage('Infrastructure Gate') {
+      steps {
+        sh 'docker run --rm -v "$PWD/terraform":/tf bridgecrew/checkov:latest -d /tf --framework terraform --compact --quiet --skip-download'
+      }
+    }
   }
 }
