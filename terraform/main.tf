@@ -155,7 +155,7 @@ resource "aws_eks_node_group" "primary" {
   node_group_name = "primary"
   node_role_arn   = aws_iam_role.eks_nodes.arn
   subnet_ids      = data.aws_subnets.default.ids
-  instance_types  = ["t3.medium"]
+  instance_types  = ["m7i-flex.large"]
 
   scaling_config {
     desired_size = 1
