@@ -137,6 +137,17 @@ resource "aws_eks_cluster" "securestock" {
   depends_on = [aws_iam_role_policy_attachment.eks_cluster, aws_iam_role_policy.eks_kms]
 }
 
+# The Jenkins VM is in the same VPC, so it reaches the Kubernetes API through the private endpoint
+resource "aws_security_group_rule" "api_from_vpc" {
+  type              = "ingress"
+  description       = "Kubernetes API from inside the VPC (Jenkins VM)"
+  from_port         = 443
+  to_port           = 443
+  protocol          = "tcp"
+  cidr_blocks       = [data.aws_vpc.default.cidr_block]
+  security_group_id = aws_eks_cluster.securestock.vpc_config[0].cluster_security_group_id
+}
+
 # Worker node role
 resource "aws_iam_role" "eks_nodes" {
   name = "securestock-eks-nodes"
