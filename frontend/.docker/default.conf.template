@@ -1,0 +1,21 @@
+server {
+    listen 80;
+    server_name localhost;
+
+    # Pass API calls to the backend (host and DNS resolver are filled in at container start)
+    location /api/ {
+        resolver ${NGINX_LOCAL_RESOLVERS} valid=10s;
+        set $backend http://${BACKEND_HOST}:8080;
+        proxy_pass $backend;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
+    location / {
+        root /usr/share/nginx/html;
+        index index.html;
+        try_files $uri $uri/ /index.html;
+    }
+
+    error_page 404 /index.html;
+}

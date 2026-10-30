@@ -28,6 +28,21 @@ data "aws_subnets" "default" {
   }
 }
 
+# Tag the subnets so Kubernetes can create a public load balancer in them
+resource "aws_ec2_tag" "subnet_cluster" {
+  for_each    = toset(data.aws_subnets.default.ids)
+  resource_id = each.value
+  key         = "kubernetes.io/cluster/securestock-eks"
+  value       = "shared"
+}
+
+resource "aws_ec2_tag" "subnet_elb" {
+  for_each    = toset(data.aws_subnets.default.ids)
+  resource_id = each.value
+  key         = "kubernetes.io/role/elb"
+  value       = "1"
+}
+
 data "aws_caller_identity" "current" {}
 
 # One customer-managed key for ECR images and EKS secrets

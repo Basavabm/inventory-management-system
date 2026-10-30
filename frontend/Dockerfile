@@ -20,7 +20,8 @@ FROM nginx:1.28-alpine
 RUN apk upgrade --no-cache
 
 # Copy the custom nginx.conf file to the container
-COPY .docker/nginx.conf /etc/nginx/nginx.conf
+COPY .docker/default.conf.template /etc/nginx/templates/default.conf.template
+ENV BACKEND_HOST=spring-boot-app NGINX_ENTRYPOINT_LOCAL_RESOLVERS=1
 
 # Copy the built React app from the build stage to the nginx container
 COPY --from=build /app/build /usr/share/nginx/html
