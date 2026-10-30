@@ -3,6 +3,7 @@ pipeline {
   parameters {
     booleanParam(name: 'PROVISION', defaultValue: false, description: 'Create ECR + EKS on AWS (costs about $0.14/hour)')
     booleanParam(name: 'DESTROY', defaultValue: false, description: 'Delete everything Terraform created on AWS')
+    booleanParam(name: 'DEPLOY', defaultValue: false, description: 'Push images to ECR and deploy SecureStock to EKS')
   }
   options { timestamps() }
   stages {
@@ -122,9 +123,73 @@ pipeline {
           input message: 'DELETE the AWS resources created by Terraform?', ok: 'Destroy'
         }
         withCredentials([string(credentialsId: 'aws-access-key-id', variable: 'AWS_ACCESS_KEY_ID'), string(credentialsId: 'aws-secret-access-key', variable: 'AWS_SECRET_ACCESS_KEY')]) {
-          sh '''CIDR="$(curl -s https://checkip.amazonaws.com | tr -d '[:space:]')/32"
+          sh '''export AWS_DEFAULT_REGION=ap-southeast-2 KUBECONFIG="$WORKSPACE/.kubeconfig"
+          aws eks update-kubeconfig --name securestock-eks && kubectl delete namespace securestock --timeout=300s || true
+          CIDR="$(curl -s https://checkip.amazonaws.com | tr -d '[:space:]')/32"
           sh scripts/tf.sh init -input=false -backend-config=path=/state/terraform.tfstate
           sh scripts/tf.sh destroy -input=false -auto-approve -var=authorized_cidr=$CIDR'''
+        }
+      }
+    }
+    stage('ECR: Push Images') {
+      when { expression { return params.DEPLOY } }
+      steps {
+        withCredentials([string(credentialsId: 'aws-access-key-id', variable: 'AWS_ACCESS_KEY_ID'), string(credentialsId: 'aws-secret-access-key', variable: 'AWS_SECRET_ACCESS_KEY')]) {
+          sh '''export AWS_DEFAULT_REGION=ap-southeast-2
+          ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+          REGISTRY=$ACCOUNT.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+          aws ecr get-login-password | docker login --username AWS --password-stdin $REGISTRY
+          for img in backend frontend; do
+            docker tag securestock-$img:${BUILD_NUMBER} $REGISTRY/securestock-$img:${BUILD_NUMBER}
+            docker push $REGISTRY/securestock-$img:${BUILD_NUMBER}
+          done
+          docker logout $REGISTRY'''
+        }
+      }
+    }
+    stage('EKS: Deploy') {
+      when { expression { return params.DEPLOY } }
+      steps {
+        withCredentials([string(credentialsId: 'aws-access-key-id', variable: 'AWS_ACCESS_KEY_ID'), string(credentialsId: 'aws-secret-access-key', variable: 'AWS_SECRET_ACCESS_KEY')]) {
+          sh '''export AWS_DEFAULT_REGION=ap-southeast-2 KUBECONFIG="$WORKSPACE/.kubeconfig"
+          ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+          REGISTRY=$ACCOUNT.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+          aws eks update-kubeconfig --name securestock-eks
+          kubectl apply -f k8s/namespace.yaml
+          kubectl -n securestock get secret db-credentials >/dev/null 2>&1 || kubectl -n securestock create secret generic db-credentials --from-literal=password="$(head -c 48 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 20)"
+          sed -e "s|__BACKEND_IMAGE__|$REGISTRY/securestock-backend:${BUILD_NUMBER}|" -e "s|__FRONTEND_IMAGE__|$REGISTRY/securestock-frontend:${BUILD_NUMBER}|" k8s/securestock.yaml > rendered.yaml
+          kubectl apply -f rendered.yaml
+          kubectl -n securestock rollout status deployment/postgres --timeout=180s
+          kubectl -n securestock rollout status deployment/backend --timeout=420s
+          kubectl -n securestock rollout status deployment/frontend --timeout=180s'''
+        }
+      }
+    }
+    stage('Health Checks and Smoke Tests') {
+      when { expression { return params.DEPLOY } }
+      steps {
+        withCredentials([string(credentialsId: 'aws-access-key-id', variable: 'AWS_ACCESS_KEY_ID'), string(credentialsId: 'aws-secret-access-key', variable: 'AWS_SECRET_ACCESS_KEY')]) {
+          sh '''export AWS_DEFAULT_REGION=ap-southeast-2 KUBECONFIG="$WORKSPACE/.kubeconfig"
+          aws eks update-kubeconfig --name securestock-eks
+          kubectl -n securestock get pods
+          LB=""
+          for i in $(seq 1 40); do
+            LB=$(kubectl -n securestock get svc frontend -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+            [ -n "$LB" ] && break
+            echo "waiting for the load balancer..."; sleep 15
+          done
+          [ -n "$LB" ] || { echo "No load balancer address"; exit 1; }
+          echo "App URL: http://$LB"
+          code=000
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" http://$LB/api/products || true)
+            echo "attempt $i: /api/products -> $code"
+            [ "$code" = "200" ] && break
+            sleep 15
+          done
+          [ "$code" = "200" ] || { echo "Smoke test failed: API did not answer 200"; exit 1; }
+          curl -sf -o /dev/null http://$LB/ || { echo "Smoke test failed: frontend page"; exit 1; }
+          echo "Smoke tests passed"'''
         }
       }
     }
