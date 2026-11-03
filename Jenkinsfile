@@ -4,6 +4,7 @@ pipeline {
     booleanParam(name: 'PROVISION', defaultValue: false, description: 'Create ECR + EKS on AWS (costs about $0.14/hour)')
     booleanParam(name: 'DESTROY', defaultValue: false, description: 'Delete everything Terraform created on AWS')
     booleanParam(name: 'DEPLOY', defaultValue: false, description: 'Push images to ECR and deploy SecureStock to EKS')
+    booleanParam(name: 'MONITOR', defaultValue: false, description: 'Install Prometheus and Grafana on EKS')
   }
   options { timestamps() }
   stages {
@@ -124,7 +125,7 @@ pipeline {
         }
         withCredentials([string(credentialsId: 'aws-access-key-id', variable: 'AWS_ACCESS_KEY_ID'), string(credentialsId: 'aws-secret-access-key', variable: 'AWS_SECRET_ACCESS_KEY')]) {
           sh '''export AWS_DEFAULT_REGION=ap-southeast-2 KUBECONFIG="$WORKSPACE/.kubeconfig"
-          aws eks update-kubeconfig --name securestock-eks && kubectl delete namespace securestock --timeout=300s || true
+          aws eks update-kubeconfig --name securestock-eks && kubectl delete namespace securestock monitoring --timeout=300s || true
           CIDR="$(curl -s https://checkip.amazonaws.com | tr -d '[:space:]')/32"
           sh scripts/tf.sh init -input=false -backend-config=path=/state/terraform.tfstate
           sh scripts/tf.sh destroy -input=false -auto-approve -var=authorized_cidr=$CIDR'''
@@ -190,6 +191,39 @@ pipeline {
           [ "$code" = "200" ] || { echo "Smoke test failed: API did not answer 200"; exit 1; }
           curl -sf -o /dev/null http://$LB/ || { echo "Smoke test failed: frontend page"; exit 1; }
           echo "Smoke tests passed"'''
+        }
+      }
+    }
+    stage('Monitoring: Prometheus and Grafana') {
+      when { expression { return params.MONITOR || params.DEPLOY } }
+      options { timeout(time: 25, unit: 'MINUTES') }
+      steps {
+        withCredentials([string(credentialsId: 'aws-access-key-id', variable: 'AWS_ACCESS_KEY_ID'), string(credentialsId: 'aws-secret-access-key', variable: 'AWS_SECRET_ACCESS_KEY')]) {
+          sh '''export AWS_DEFAULT_REGION=ap-southeast-2 KUBECONFIG="$WORKSPACE/.kubeconfig"
+          aws eks update-kubeconfig --name securestock-eks
+          kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
+          kubectl -n monitoring get secret grafana-admin >/dev/null 2>&1 || kubectl -n monitoring create secret generic grafana-admin --from-literal=admin-user=admin --from-literal=admin-password="$(head -c 48 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 20)"
+          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+          helm repo update
+          helm upgrade --install monitoring prometheus-community/kube-prometheus-stack --version 92.17.1 --namespace monitoring -f k8s/monitoring-values.yaml --wait --timeout 15m
+          kubectl -n monitoring get pods
+          LB=""
+          for i in $(seq 1 40); do
+            LB=$(kubectl -n monitoring get svc monitoring-grafana -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+            [ -n "$LB" ] && break
+            echo "waiting for the Grafana load balancer..."; sleep 15
+          done
+          [ -n "$LB" ] || { echo "No Grafana load balancer address"; exit 1; }
+          echo "Grafana URL: http://$LB"
+          code=000
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" http://$LB/login || true)
+            echo "attempt $i: /login -> $code"
+            [ "$code" = "200" ] && break
+            sleep 15
+          done
+          [ "$code" = "200" ] || { echo "Grafana did not answer 200"; exit 1; }
+          echo "Monitoring is up"'''
         }
       }
     }
