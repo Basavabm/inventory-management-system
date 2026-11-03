@@ -74,7 +74,8 @@ pipeline {
     }
     stage('Terraform: Validate') {
       steps {
-        sh '''docker run --rm -u $(id -u):$(id -g) -e HOME=/tmp -v "$PWD/terraform":/tf -w /tf hashicorp/terraform:1.9 init -backend=false -input=false
+        sh '''rm -rf terraform/.terraform
+        docker run --rm -u $(id -u):$(id -g) -e HOME=/tmp -v "$PWD/terraform":/tf -w /tf hashicorp/terraform:1.9 init -backend=false -input=false
         docker run --rm -u $(id -u):$(id -g) -e HOME=/tmp -v "$PWD/terraform":/tf -w /tf hashicorp/terraform:1.9 validate'''
       }
     }
@@ -95,6 +96,7 @@ pipeline {
           sh '''mkdir -p /var/lib/jenkins/tfstate/plugins
           CIDR="$(curl -s https://checkip.amazonaws.com | tr -d '[:space:]')/32"
           echo "EKS API will be limited to $CIDR"
+          rm -rf terraform/.terraform
           sh scripts/tf.sh init -input=false -backend-config=path=/state/terraform.tfstate
           sh scripts/tf.sh plan -input=false -var=authorized_cidr=$CIDR -out=tfplan'''
         }
@@ -127,6 +129,7 @@ pipeline {
           sh '''export AWS_DEFAULT_REGION=ap-southeast-2 KUBECONFIG="$WORKSPACE/.kubeconfig"
           aws eks update-kubeconfig --name securestock-eks && kubectl delete namespace securestock monitoring --timeout=300s || true
           CIDR="$(curl -s https://checkip.amazonaws.com | tr -d '[:space:]')/32"
+          rm -rf terraform/.terraform
           sh scripts/tf.sh init -input=false -backend-config=path=/state/terraform.tfstate
           sh scripts/tf.sh destroy -input=false -auto-approve -var=authorized_cidr=$CIDR'''
         }
